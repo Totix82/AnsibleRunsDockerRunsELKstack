@@ -1,0 +1,49 @@
+---
+- hosts: all
+  become: true
+
+  tasks:
+    - name: Install aptitude using apt
+      apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
+
+    - name: Install required system packages
+      apt: name={{ item }} state=latest update_cache=yes
+      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu xenial stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt: update_cache=yes name=docker-ce state=latest
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+
+    - name: Install docker-compose
+      apt: update_cache=yes name=docker-compose state=latest
+    
+    - name: Copy docker-compose file from Orchestrator to Guest 
+      copy:
+       src: /etc/ansible/docker-compose.yml
+       dest: /etc/docker
+       owner: root
+       mode: '0777'
+
+    - name: Enable Docker service
+      become: true
+      become_user: root
+      shell: systemctl start docker
+
+    - name: Run ELK Stack docker-compose file
+      docker_compose:
+       project_src: /etc/docker
+       files:
+       - docker-compose.yml
